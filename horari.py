@@ -8,13 +8,17 @@ from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import os
+import shutil
+from svglib.svglib import svg2rlg, register_font
+from reportlab.graphics import renderPDF
+import datetime
 
 # Which month and year you want to generate
-month = 9
-year = 2021
+starting_month = 9
+starting_year = 2021
 
 # How many weeks
-number_of_weeks = 4
+number_of_weeks = 18
 
 # Which subjects to get (short name and color)
 SUBJECT_PROPS = {
@@ -42,17 +46,13 @@ MONTHS = [
 	'gen', 'febr', 'març', 'abr', 'maig', 'juny', 'jul', 'ago', 'set', 'oct', 'nov', 'des'
 ]
 
-# Create path to save the files
-if not os.path.exists(MONTHS[month-1]):
-	os.mkdir(MONTHS[month-1])
-
 
 ################################
 # Get the data from the website
 ################################
 
 results = ['<div class="fc-event-container" style="position:absolute;z-index:8;top:0;left:0">\n'] * number_of_weeks
-starting_days = [None] * number_of_weeks
+starting_day = None
 
 driver = webdriver.Chrome()
 for course in courses:
@@ -68,13 +68,14 @@ for course in courses:
 	driver.find_element_by_id('buscarCalendario').click()
 	
 	driver.find_element_by_id('comboMesesAnyos').click()
-	driver.find_element(By.CSS_SELECTOR, f'option[value="{month}/{year}"]').click()
+	driver.find_element(By.CSS_SELECTOR, f'option[value="{starting_month}/{starting_year}"]').click()
+	
+	# Get the starting day
+	starting_day = int(driver.find_element_by_class_name('fc-header-title').text[:2])
 	
 	for i in range(number_of_weeks):
 	
-		WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event')))
-		
-		starting_days[i] = int(driver.find_element_by_class_name('fc-header-title').text[:2])
+		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event')))
 		
 		for event in driver.find_elements_by_class_name('fc-event'):
 			results[i] += event.get_attribute('outerHTML') + '\n'
@@ -93,17 +94,23 @@ driver.close()
 #####################################################
 
 class SubjectType(IntEnum):
+	UNKNOWN = -1
 	THEORY = 0
 	SEMINAR = 1
 	PROBLEMS = 2
+	EXAM = 3
 	
 	def __str__(self):
 		return self.name
+	
+class HolidayType(IntEnum):
+	FESTIU = 0
+	NO_LECTIU = 1
 
 
 # Stores information of a subject
 class Subject:
-	def __init__(self, id: str, group: int, type: SubjectType, classroom: str):
+	def __init__(self, id: str, group: str, type: SubjectType, classroom: str):
 		self.id = id
 		self.group = group
 		self.type = type
@@ -138,6 +145,20 @@ def get_day_from_event(event):
 	raise ValueError(f"{event} does not fit in any day")
 
 
+# Create path to save the files
+if os.path.exists('results'):
+	shutil.rmtree('results')
+os.mkdir('results')
+
+if os.path.exists('temp'):
+	shutil.rmtree('temp')
+os.mkdir('temp')
+
+
+register_font('calibri', 'calibri_bold.ttf', 'bold')
+
+date = datetime.date(starting_year, starting_month, starting_day)
+
 for week_n, result in enumerate(results):
 	
 	#############################################
@@ -154,7 +175,7 @@ for week_n, result in enumerate(results):
 	}
 	
 	# Which days of the week are holidays (no lectiu o festiu)
-	holidays = list()
+	holidays = dict()
 	
 	parsed = BeautifulSoup(result, 'html.parser')
 	
@@ -165,9 +186,14 @@ for week_n, result in enumerate(results):
 		content = event.find('div', {'class': 'fc-event-title'})
 		
 		# Check if it's holiday (then skip everything else)
-		if content.getText() == "Dia festiu" or content.getText() ==  "Dia no lectiu":
+		if content.getText() == "Dia festiu":
 			day = get_day_from_event(event)
-			holidays.append(day)
+			holidays[day] = HolidayType.FESTIU
+			continue
+	
+		elif content.getText() ==  "Dia no lectiu":
+			day = get_day_from_event(event)
+			holidays[day] = HolidayType.NO_LECTIU
 			continue
 		
 		
@@ -183,18 +209,21 @@ for week_n, result in enumerate(results):
 			
 			group_text = re.search('(?<=Grup ).*?(?=<br/>)', content).group(0)
 			
-			group = int(group_text[:group_text.find(' - ')])
+			group = group_text[:group_text.find(' - ')]
 			type_text = group_text[group_text.find(' - ')+3:]
 			
-			type = None
+			subject_type = None
 			if type_text == 'Teoria':
-				type = SubjectType.THEORY
+				subject_type = SubjectType.THEORY
 			elif type_text == "Pràctiques d'Aula" or type_text == "Pràctiques de Laboratori":
-				type = SubjectType.PROBLEMS
+				subject_type = SubjectType.PROBLEMS
 			elif type_text == "Seminaris":
-				type = SubjectType.SEMINAR
+				subject_type = SubjectType.SEMINAR
+			elif type_text == "Examen":
+				subject_type = SubjectType.EXAM
 			else:
-				raise ValueError(f"{event} has not valid type {type_text}")
+				subject_type = SubjectType.UNKNOWN
+				print(f"ERROR: {event} has not valid type {type_text}")
 			
 			
 			classroom = re.search('(?<=Aula ).*?(?= -)', content)
@@ -209,7 +238,7 @@ for week_n, result in enumerate(results):
 				if h not in table[day].keys():
 					table[day][h] = list()
 				
-				table[day][h].append(Subject(subject_id, group, type, classroom))
+				table[day][h].append(Subject(subject_id, group, subject_type, classroom))
 	
 	
 	#########################################
@@ -248,20 +277,20 @@ for week_n, result in enumerate(results):
 		day_x = get_day_x(day)
 		
 		# Draw gray background on the day label
-		if day in holidays:
+		if day in holidays.keys():
 			d.append(draw.Rectangle(
 				day_x,
 				height - day_label_height,
 				day_width,
 				day_height,
-				fill='lightgray',
+				fill='#BEBEBE',
 				stroke='black',
 				stroke_width='0.2'
 			))
 		
 		# Draw day and month text on top
 		d.append(draw.Text(
-			f"{day + starting_days[week_n]}-{MONTHS[month-1]}",
+			f"{date.day}-{MONTHS[date.month-1]}",
 			text_size,
 			day_x + day_width / 2,
 			height - day_label_height / 2,
@@ -270,6 +299,8 @@ for week_n, result in enumerate(results):
 			font_weight='bold',
 			font_family='calibri'
 		))
+		
+		date += datetime.timedelta(days=1)
 		
 		for hour in range(first_hour, first_hour + n_hours):
 			
@@ -305,6 +336,10 @@ for week_n, result in enumerate(results):
 						text += f" Se{s.group}"
 					elif s.type == SubjectType.PROBLEMS:
 						text += f" Pb{s.group}"
+					elif s.type == SubjectType.EXAM:
+						text += f" {s.group} Examen"
+					elif s.type == SubjectType.UNKNOWN:
+						text += f" {s.group} (??)"
 					
 					text += f"\n{s.classroom}"
 					
@@ -343,19 +378,28 @@ for week_n, result in enumerate(results):
 	d.append(draw.Line(hour_label_width, 0, hour_label_width, height, stroke='black', stroke_width=dark_line_width))
 	
 	# Draw holidays as gray
-	for day in holidays:
+	for day in holidays.keys():
 		day_x = get_day_x(day)
 		d.append(draw.Rectangle(
 			day_x,
 			0,
 			day_width,
 			work_height,
-			fill='lightgray',
+			fill='#BEBEBE',
 			stroke='black',
 			stroke_width='0.2'
 		))
+		
+		holiday_text = None
+		if holidays[day] == HolidayType.FESTIU:
+			holiday_text = 'FESTIU'
+		elif holidays[day] == HolidayType.NO_LECTIU:
+			holiday_text = 'NO LECTIU'
+		else:
+			holiday_text = 'FESTA??'
+		
 		d.append(draw.Text(
-			"FESTIU",
+			holiday_text,
 			text_size,
 			day_x + day_width / 2,
 			work_height / 2,
@@ -365,4 +409,20 @@ for week_n, result in enumerate(results):
 			font_family='calibri'
 		))
 	
-	d.saveSvg(f"{MONTHS[month-1]}/{week_n}.svg")
+	d.saveSvg(f'temp/{week_n}.svg')
+	
+	drawing = svg2rlg(f'temp/{week_n}.svg')
+	renderPDF.drawToFile(drawing, f'results/{week_n}.pdf')
+	
+	# Skip the weekend
+	date += datetime.timedelta(days=2)
+
+
+# Merge all pdfs into one
+import PyPDF2
+merger = PyPDF2.PdfFileMerger()
+
+for i in range(number_of_weeks):
+	merger.append(f'results/{i}.pdf', 'rb')
+
+merger.write('results/result.pdf')

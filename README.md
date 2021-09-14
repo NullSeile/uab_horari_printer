@@ -17,3 +17,13 @@ To navigate the website programmatically:
 pip install selenium
 ```
 selenium needs [_chromedriver_](https://chromedriver.storage.googleapis.com/index.html?path=93.0.4577.63/)
+
+To transform to pdf:
+```
+pip install svglib
+```
+
+To merge pdfs:
+```
+pip install pypdf2
+```
