@@ -41,9 +41,6 @@ courses = ['CURS - 1', 'CURS - 2']
 MONTHS = [
 	'gen', 'febr', 'març', 'abr', 'maig', 'juny', 'jul', 'ago', 'set', 'oct', 'nov', 'des'
 ]
-MONTHS_LONG = [
-	'Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny', 'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre'
-]
 
 # Create path to save the files
 if not os.path.exists(MONTHS[month-1]):
@@ -90,11 +87,10 @@ for result in results:
 
 driver.close()
 
-############################################
-# Parse the data collected from the website
-# into a manejable format for drawing and
-# draw it to a svg
-############################################
+#####################################################
+# Parse the data collected from the website into a
+# manejable format for drawing and draw it to a svg
+#####################################################
 
 class SubjectType(IntEnum):
 	THEORY = 0
