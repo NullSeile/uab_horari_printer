@@ -75,7 +75,7 @@ for course in courses:
 	
 	for i in range(number_of_weeks):
 	
-		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event')))
+		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 		
 		for event in driver.find_elements_by_class_name('fc-event'):
 			results[i] += event.get_attribute('outerHTML') + '\n'
@@ -98,7 +98,8 @@ class SubjectType(IntEnum):
 	THEORY = 0
 	SEMINAR = 1
 	PROBLEMS = 2
-	EXAM = 3
+	LABORATORY = 3
+	EXAM = 4
 	
 	def __str__(self):
 		return self.name
@@ -215,8 +216,10 @@ for week_n, result in enumerate(results):
 			subject_type = None
 			if type_text == 'Teoria':
 				subject_type = SubjectType.THEORY
-			elif type_text == "Pràctiques d'Aula" or type_text == "Pràctiques de Laboratori":
+			elif type_text == "Pràctiques d'Aula":
 				subject_type = SubjectType.PROBLEMS
+			elif type_text == "Pràctiques de Laboratori":
+				subject_type = SubjectType.LABORATORY
 			elif type_text == "Seminaris":
 				subject_type = SubjectType.SEMINAR
 			elif type_text == "Examen":
@@ -336,6 +339,8 @@ for week_n, result in enumerate(results):
 						text += f" Se{s.group}"
 					elif s.type == SubjectType.PROBLEMS:
 						text += f" Pb{s.group}"
+					elif s.type == SubjectType.LABORATORY:
+						text += f" Pr{s.group}"
 					elif s.type == SubjectType.EXAM:
 						text += f" {s.group} Examen"
 					elif s.type == SubjectType.UNKNOWN:
@@ -409,7 +414,8 @@ for week_n, result in enumerate(results):
 			font_family='calibri'
 		))
 	
-	d.saveSvg(f'temp/{week_n}.svg')
+	with open(f'temp/{week_n}.svg', 'w', encoding='utf8') as file:
+		d.asSvg(outputFile=file)
 	
 	drawing = svg2rlg(f'temp/{week_n}.svg')
 	renderPDF.drawToFile(drawing, f'results/{week_n}.pdf')
