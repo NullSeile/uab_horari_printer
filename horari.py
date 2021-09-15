@@ -20,31 +20,20 @@ starting_year = 2021
 # How many weeks
 number_of_weeks = 18
 
+# If you want to skip any starting week
+weeks_to_skip = 1
+
 # Which subjects to get (short name and color)
 SUBJECT_PROPS = {
-	'100095': {'short': 'GL', 'color': '#F9BF94'},
-	'100098': {'short': 'SMD', 'color': '#95B4D5'},
-	'100096': {'short': 'EA', 'color': '#B3A2C7'},
-	'100099': {'short': 'TM', 'color': '#FAC090'},
-	'100087': {'short': 'FVR', 'color': '#FFFF99'},
+	'100095': {'short': 'GL',	'color': '#ffd28a'},
+	'100098': {'short': 'SMD',	'color': '#afeeee'},
+	'100096': {'short': 'EA',	'color': '#e9ffa4'},
+	'100099': {'short': 'TM',	'color': '#ffb3ad'},
+	'100087': {'short': 'FVR',	'color': '#aba6ff'},
 }
-
-# SUBJECT_PROPS = {
-# 	'100087': {'short': 'FVR', 'color': '#B3A2C7'},
-# 	'100088': {'short': 'ALG', 'color': '#C3D69B'},
-# 	'100089': {'short': 'FM', 'color': '#FFFF99'},
-# 	'100090': {'short': 'FIS', 'color': '#FAC090'},
-# 	'100091': {'short': 'EIM', 'color': '#95B3D7'},
-# 	'100092': {'short': 'TCA', 'color': '#F79646'},
-# }
 
 # Courses to get the data from
 courses = ['CURS - 1', 'CURS - 2']
-
-# Month number to month name
-MONTHS = [
-	'gen', 'febr', 'març', 'abr', 'maig', 'juny', 'jul', 'ago', 'set', 'oct', 'nov', 'des'
-]
 
 
 ################################
@@ -56,7 +45,7 @@ starting_day = None
 
 driver = webdriver.Chrome()
 for course in courses:
-
+	
 	driver.get("https://web1.uab.es:31501/pds/consultaPublica/look%5Bconpub%5DInicioPubHora?entradaPublica=true&idioma=ca&pais=ES")
 	
 	select = Select(driver.find_element_by_id('centro'))
@@ -67,14 +56,29 @@ for course in courses:
 	
 	driver.find_element_by_id('buscarCalendario').click()
 	
+	# Force starting at start of the requested month and year
+	driver.find_element_by_id('comboMesesAnyos').click()
+	driver.find_element(By.CSS_SELECTOR, f'option[value="9/2021"]').click()
+	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
+	
+	driver.find_element_by_id('comboMesesAnyos').click()
+	driver.find_element(By.CSS_SELECTOR, f'option[value="10/2021"]').click()
+	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
+	
 	driver.find_element_by_id('comboMesesAnyos').click()
 	driver.find_element(By.CSS_SELECTOR, f'option[value="{starting_month}/{starting_year}"]').click()
+	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
+	
+	# Skip the first `weeks_to_skip` weeks
+	for i in range(weeks_to_skip):
+		driver.find_element_by_class_name('fc-button-next').click()
+		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 	
 	# Get the starting day
 	starting_day = int(driver.find_element_by_class_name('fc-header-title').text[:2])
 	
 	for i in range(number_of_weeks):
-	
+		
 		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 		
 		for event in driver.find_elements_by_class_name('fc-event'):
@@ -156,6 +160,11 @@ if os.path.exists('temp'):
 os.mkdir('temp')
 
 
+# Month number to month name
+MONTHS = [
+	'gen', 'febr', 'març', 'abr', 'maig', 'juny', 'jul', 'ago', 'set', 'oct', 'nov', 'des'
+]
+
 register_font('calibri', 'calibri_bold.ttf', 'bold')
 
 date = datetime.date(starting_year, starting_month, starting_day)
@@ -203,11 +212,6 @@ for week_n, result in enumerate(results):
 		
 		if subject_id in SUBJECT_PROPS.keys():
 			
-			hours = str(event.find('div', {'class': 'fc-event-time'}).contents[0])
-			
-			start_time = int(hours[:2])
-			end_time = int(hours[8:10])
-			
 			group_text = re.search('(?<=Grup ).*?(?=<br/>)', content).group(0)
 			
 			group = group_text[:group_text.find(' - ')]
@@ -228,6 +232,11 @@ for week_n, result in enumerate(results):
 				subject_type = SubjectType.UNKNOWN
 				print(f"ERROR: {event} has not valid type {type_text}")
 			
+			
+			hours = str(event.find('div', {'class': 'fc-event-time'}).contents[0])
+			
+			start_time = int(hours[:2])
+			end_time = int(hours[8:10])
 			
 			classroom = re.search('(?<=Aula ).*?(?= -)', content)
 			if classroom is not None:
