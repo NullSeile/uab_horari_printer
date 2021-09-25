@@ -14,6 +14,11 @@ from svglib.svglib import svg2rlg, register_font
 from reportlab.graphics import renderPDF
 import datetime
 
+class SubjectProps:
+	def __init__(self, name: str, color: str):
+		self.name = name
+		self.color = color
+
 # Which month and year you want to generate
 starting_month = 9
 starting_year = 2021
@@ -26,11 +31,11 @@ weeks_to_skip = 1
 
 # Which subjects to get (short name and color)
 SUBJECT_PROPS = {
-	'100095': {'short': 'GL',	'color': '#ffd28a'},
-	'100098': {'short': 'SMD',	'color': '#afeeee'},
-	'100096': {'short': 'EA',	'color': '#e9ffa4'},
-	'100099': {'short': 'TM',	'color': '#ffb3ad'},
-	'100087': {'short': 'FVR',	'color': '#aba6ff'},
+	'100095': SubjectProps('GL',  '#ffd28a'),
+	'100098': SubjectProps('SMD', '#afeeee'),
+	'100096': SubjectProps('EA',  '#e9ffa4'),
+	'100099': SubjectProps('TM',  '#ffb3ad'),
+	'100087': SubjectProps('FVR', '#aba6ff'),
 }
 
 # Courses to get the data from
@@ -41,7 +46,7 @@ courses = ['CURS - 1', 'CURS - 2']
 # Get the data from the website
 ################################
 
-results = ['<div class="fc-event-container" style="position:absolute;z-index:8;top:0;left:0">\n'] * number_of_weeks
+results = ['<div class="fc-event-container">\n'] * number_of_weeks
 starting_day = None
 
 driver = webdriver.Chrome()
@@ -127,7 +132,7 @@ class Subject:
 		self.classroom = classroom
 	
 	def __str__(self):
-		return f"{SUBJECT_PROPS[self.id]['short']}: {self.group} - {self.type} at {self.classroom}"
+		return f"{SUBJECT_PROPS[self.id].name}: {self.group} - {self.type} at {self.classroom}"
 	
 	def __repr__(self):
 		return f"Subject({self})"
@@ -235,7 +240,7 @@ for week_n, result in enumerate(results):
 				subject_type = SubjectType.EXAM
 			else:
 				subject_type = SubjectType.UNKNOWN
-				print(f"ERROR: {event} has not valid type {type_text}")
+				print(f"ERROR: {event} has not valid type '{type_text}'")
 			
 			
 			hours = str(event.find('div', {'class': 'fc-event-time'}).contents[0])
@@ -348,7 +353,7 @@ for week_n, result in enumerate(results):
 					
 					props = SUBJECT_PROPS[s.id]
 					
-					text = props['short']
+					text = props.name
 					if s.type == SubjectType.SEMINAR:
 						text += f" Se{s.group}"
 					elif s.type == SubjectType.PROBLEMS:
@@ -367,7 +372,7 @@ for week_n, result in enumerate(results):
 						y,
 						new_width,
 						day_height,
-						fill=props['color'],
+						fill=props.color,
 						stroke='black',
 						stroke_width=dark_line_width
 					))
