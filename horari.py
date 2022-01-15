@@ -23,14 +23,17 @@ class SubjectProps:
 		self.color = color
 
 # Which month and year you want to generate
-starting_month = 9
-starting_year = 2021
+starting_month = 2
+starting_year = 2022
 
 # How many weeks
 number_of_weeks = 18
 
 # If you want to skip any starting week
 weeks_to_skip = 1
+
+# Courses to get the data from
+courses = ['CURS - 1', 'CURS - 2']
 
 # Which subjects to get (short name and color)
 SUBJECT_PROPS = {
@@ -46,12 +49,9 @@ SUBJECT_PROPS = {
 # 	'100088': SubjectProps('ALG', '#afeeee'),
 # 	'100090': SubjectProps('FIS',  '#ffd28a'),
 # 	# '100090': SubjectProps('FIS',  '#e9ffa4'),
-# 	# '100099': SubjectProps('TM',  '#ffb3ad'),
+# 	'100099': SubjectProps('TM',  '#ffb3ad'),
 # 	'100087': SubjectProps('FVR', '#aba6ff'),
 # }
-
-# Courses to get the data from
-courses = ['CURS - 1', 'CURS - 2']
 
 
 ################################
@@ -64,49 +64,49 @@ starting_day = None
 driver = webdriver.Chrome()
 for course in courses:
 	
-	driver.get("https://web1.uab.es:31501/pds/consultaPublica/look%5Bconpub%5DInicioPubHora?entradaPublica=true&idioma=ca&pais=ES")
+	driver.get("https://web01.uab.es:31501/pds/consultaPublica/look%5Bconpub%5DInicioPubHora?entradaPublica=true&idioma=ca&pais=ES")
 	
-	select = Select(driver.find_element_by_id('centro'))
+	select = Select(driver.find_element(By.ID, 'centro'))
 	select.select_by_visible_text("103 - Facultat de Ciències")
 	
-	select = Select(driver.find_element_by_id('curso'))
+	select = Select(driver.find_element(By.ID, 'curso'))
 	select.select_by_visible_text(course)
 	
-	driver.find_element_by_id('buscarCalendario').click()
+	driver.find_element(By.ID, 'buscarCalendario').click()
 	
 	# Force starting at start of the requested month and year
-	driver.find_element_by_id('comboMesesAnyos').click()
+	driver.find_element(By.ID, 'comboMesesAnyos').click()
 	driver.find_element(By.CSS_SELECTOR, f'option[value="9/2021"]').click()
 	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 	
-	driver.find_element_by_id('comboMesesAnyos').click()
+	driver.find_element(By.ID, 'comboMesesAnyos').click()
 	driver.find_element(By.CSS_SELECTOR, f'option[value="10/2021"]').click()
 	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 	
-	driver.find_element_by_id('comboMesesAnyos').click()
+	driver.find_element(By.ID, 'comboMesesAnyos').click()
 	driver.find_element(By.CSS_SELECTOR, f'option[value="{starting_month}/{starting_year}"]').click()
 	WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 	
 	# Skip the first `weeks_to_skip` weeks
 	for i in range(weeks_to_skip):
-		driver.find_element_by_class_name('fc-button-next').click()
+		driver.find_element(By.CLASS_NAME, 'fc-button-next').click()
 		WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event-container')))
 	
 	# Get the starting day
-	starting_day = int(driver.find_element_by_class_name('fc-header-title').text[:2])
+	starting_day = int(driver.find_element(By.CLASS_NAME, 'fc-header-title').text[:2])
 	
 	for i in range(number_of_weeks):
 		
 		try:
 			WebDriverWait(driver, 3).until(EC.presence_of_element_located((By.CLASS_NAME, 'fc-event')))
 			
-			for event in driver.find_elements_by_class_name('fc-event'):
+			for event in driver.find_elements(By.CLASS_NAME, 'fc-event'):
 				results[i] += event.get_attribute('outerHTML') + '\n'
 			
 		except TimeoutException:
 			print(f"WARNING: No events in week {i}")
 		
-		driver.find_element_by_class_name('fc-button-next').click()
+		driver.find_element(By.CLASS_NAME, 'fc-button-next').click()
 
 
 for result in results:
@@ -149,7 +149,6 @@ class Subject:
 	
 	def __repr__(self):
 		return f"Subject({self})"
-
 
 class Day:
 	def __init__(self):
@@ -240,10 +239,10 @@ for week_n, result in enumerate(results):
 		day_n = get_day_from_event(event)
 		
 		# Check if it's holiday
-		if content.getText() == "Dia festiu":
+		if "Dia festiu" in content.getText():
 			week[day_n].holiday = HolidayType.FESTIU
 	
-		elif content.getText() ==  "Dia no lectiu":
+		elif "Dia no lectiu" in content.getText():
 			week[day_n].holiday = HolidayType.NO_LECTIU
 		
 		else:
