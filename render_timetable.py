@@ -1,12 +1,14 @@
-from typing import List
+import os
+import shutil
+from typing import Dict, List
 import drawSvg as draw
 from svglib.svglib import svg2rlg, register_font
 from reportlab.graphics import renderPDF
 
-from utils import MONTH_NAME, SUBJECT_PROPS, HolidayType, Subject, SubjectType, Week
+from utils import MONTH_NAME, HolidayType, Subject, SubjectProps, SubjectType, Week
 
 
-def render_to_pdf(weeks: List[Week]):
+def render_to_pdf(weeks: List[Week], subjects_props: Dict[str, SubjectProps]):
 
     register_font("calibri", "calibri_bold.ttf", "bold")
 
@@ -34,6 +36,15 @@ def render_to_pdf(weeks: List[Week]):
 
     def get_hour_y(hour):
         return height - day_label_height - day_height - (hour - first_hour) * day_height
+
+    # Create path to save the files
+    if os.path.exists("results"):
+        shutil.rmtree("results")
+    os.mkdir("results")
+
+    if os.path.exists("temp"):
+        shutil.rmtree("temp")
+    os.mkdir("temp")
 
     for week_n, week in enumerate(weeks):
 
@@ -80,7 +91,7 @@ def render_to_pdf(weeks: List[Week]):
 
                     x = day_x + i * new_width
 
-                    props = SUBJECT_PROPS[s.id]
+                    props = subjects_props[s.id]
 
                     text = props.name
                     if s.type == SubjectType.SEMINAR:

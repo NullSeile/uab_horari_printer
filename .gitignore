@@ -1,3 +1,4 @@
 .idea/
 results/
 temp/
+*.pyc

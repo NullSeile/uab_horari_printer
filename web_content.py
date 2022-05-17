@@ -16,37 +16,21 @@ from selenium.common.exceptions import TimeoutException
 from bs4 import BeautifulSoup, Tag
 import bs4.element
 
-from utils import HolidayType, Subject, SubjectType, Week
+from utils import SUBJECT_PROPS, HolidayType, Subject, SubjectType, Week
 
 # from selenium.webdriver.remote.webelement import WebElement
 
-
-class SubjectProps:
-    def __init__(self, name: str, color: str):
-        self.name = name
-        self.color = color
-
-
-# Which subjects to get (short name and color)
-SUBJECT_PROPS = {
-    # "100095": SubjectProps("GL", "#ffd28a"),
-    # "100098": SubjectProps("SMD", "#afeeee"),
-    # "100096": SubjectProps("EA", "#e9ffa4"),
-    # "100099": SubjectProps("TM", "#ffb3ad"),
-    "100087": SubjectProps("FVR", "#aba6ff"),
-}
-
-starting_month = 2
-starting_year = 2022
+# starting_month = 2
+# starting_year = 2022
 
 # How many weeks
-number_of_weeks = 1
+# number_of_weeks = 1
 
 # If you want to skip any starting week
-weeks_to_skip = 1
+# weeks_to_skip = 1
 
 
-def try_until_success(method: Callable):
+def _try_until_success(method: Callable):
     while True:
         try:
             method()
@@ -55,15 +39,16 @@ def try_until_success(method: Callable):
             pass
 
 
-def get_day_number_from_event(event: bs4.element.Tag):
-
-    print(event)
-    print(event.get("style"))
+def _get_day_number_from_event(event: bs4.element.Tag):
 
     # Position in the screen of each day
     WEEKDAYS_X = [62, 207, 351, 495, 639, 779]  # Saturday
 
-    position = float(re.search("(?<=left: ).*?(?=px;)", event.get("style")).group(0))
+    position_re = re.search("(?<=left: ).*?(?=px;)", event.get("style"))
+    if not position_re:
+        raise Exception(f"How tf this doesn't have position? {event}")
+
+    position = float(position_re.group(0))
 
     for i in range(5):
         if WEEKDAYS_X[i] <= position < WEEKDAYS_X[i + 1]:
@@ -72,21 +57,16 @@ def get_day_number_from_event(event: bs4.element.Tag):
     raise ValueError(f"{event} does not fit in any day")
 
 
-def parse_html_to_week(events: List[str], date: datetime.date) -> Week:
-    # parsed = BeautifulSoup(html, "html.parser")
-
+def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
     week = Week(date)
 
-    # for event in parsed.select(
-    #     'div[class*="fc-event fc-event-vert fc-event-start fc-event-end"]'
-    # ):
     for event_html in events:
         event = BeautifulSoup(event_html, "html.parser").select(
             'div[class*="fc-event fc-event-vert fc-event-start fc-event-end"]'
         )[0]
 
         content = event.find("div", {"class": "fc-event-title"})
-        day_n = get_day_number_from_event(event)
+        day_n = _get_day_number_from_event(event)
 
         # Check if it's holiday
         if "Dia festiu" in content.getText():
@@ -97,56 +77,68 @@ def parse_html_to_week(events: List[str], date: datetime.date) -> Week:
 
         else:
             content = str(content.find("p"))
-            subject_id = re.search("(?<=<p>).*?(?= -)", content).group(0)
 
-            if subject_id in SUBJECT_PROPS.keys():
+            subject_id_re = re.search("(?<=<p>).*?(?= -)", content)
+            if not subject_id_re:
+                raise Exception(f"Something doesn't have a subject id? {content}")
 
-                subject = Subject()
+            subject = Subject()
 
-                subject.id = subject_id
+            subject_id = subject_id_re.group(0)
+            subject.id = subject_id
 
-                # Get the group
-                group_text = re.search("(?<=Grup ).*?(?=<br/>)", content).group(0)
-                subject.group = group_text[: group_text.find(" - ")]
+            # Get the group
+            group_text_re = re.search("(?<=Grup ).*?(?=<br/>)", content)
+            if not group_text_re:
+                raise Exception(f"There is not group? {content}")
 
-                # Get the subject type
-                type_text = group_text[group_text.find(" - ") + 3 :]
-                if type_text == "Teoria":
-                    subject.type = SubjectType.THEORY
-                elif type_text == "Pràctiques d'Aula":
-                    subject.type = SubjectType.PROBLEMS
-                elif type_text == "Pràctiques de Laboratori":
-                    subject.type = SubjectType.LABORATORY
-                elif type_text == "Seminaris":
-                    subject.type = SubjectType.SEMINAR
-                elif type_text == "Examen":
-                    subject.type = SubjectType.EXAM
-                else:
-                    subject.type = SubjectType.UNKNOWN
-                    print(f"ERROR: {event} has not valid type '{type_text}'")
+            group_text = group_text_re.group(0)
+            subject.group = group_text[: group_text.find(" - ")]
 
-                # Get the classroom
-                classroom = re.search("(?<=Aula ).*?(?= -)", content)
-                if classroom is not None:
-                    subject.classroom = classroom.group(0)
-                else:
-                    subject.classroom = ""
+            # Get the subject type
+            type_text = group_text[group_text.find(" - ") + 3 :]
+            if type_text == "Teoria":
+                subject.type = SubjectType.THEORY
+            elif type_text == "Pràctiques d'Aula":
+                subject.type = SubjectType.PROBLEMS
+            elif type_text == "Pràctiques de Laboratori":
+                subject.type = SubjectType.LABORATORY
+            elif type_text == "Seminaris":
+                subject.type = SubjectType.SEMINAR
+            elif type_text == "Examen":
+                subject.type = SubjectType.EXAM
+            else:
+                subject.type = SubjectType.UNKNOWN
+                print(f"ERROR: {event} has not valid type '{type_text}'")
 
-                # Get the hour
-                hours = str(event.find("div", {"class": "fc-event-time"}).contents[0])
+            # Get the classroom
+            classroom = re.search("((?<=Aules )|(?<=Aula )).*?(?= -)", content)
+            if classroom is not None:
+                subject.classroom = classroom.group(0)
+            else:
+                subject.classroom = ""
 
-                start_time = int(hours[:2])
-                end_time = int(hours[8:10])
+            # Get the hour
+            hours = str(event.find("div", {"class": "fc-event-time"}).contents[0])
 
-                # Add the Subject
-                for h in range(start_time, end_time):
+            start_time = int(hours[:2])
+            end_time = int(hours[8:10])
 
-                    week[day_n].add_subject(h, subject)
+            # Add the Subject
+            for h in range(start_time, end_time):
+
+                week[day_n].add_subject(h, subject)
 
     return week
 
 
-def get_web_xml():
+def get_weeks_from_web(
+    subjects_id: List[str],
+    starting_month: int,
+    starting_year: int,
+    weeks_to_skip: int,
+    number_of_weeks: int,
+) -> List[Week]:
 
     driver = webdriver.Chrome()
 
@@ -156,7 +148,7 @@ def get_web_xml():
 
     driver.find_element(By.ID, "tabAsignatura").click()
 
-    for id in SUBJECT_PROPS.keys():
+    for id in subjects_id:
         div = driver.find_element(By.CLASS_NAME, "bootstrap-tagsinput")
         input_text = div.find_element(By.CSS_SELECTOR, "input")
         input_text.send_keys(id)
@@ -164,11 +156,12 @@ def get_web_xml():
 
         sleep(1)
 
-        try_until_success(lambda: driver.find_element(By.ID, "aceptarFiltro").click())
+        _try_until_success(lambda: driver.find_element(By.ID, "aceptarFiltro").click())
 
         sleep(1)
 
-    try_until_success(lambda: driver.find_element(By.ID, "buscarCalendario").click())
+    # Click calendar
+    _try_until_success(lambda: driver.find_element(By.ID, "buscarCalendario").click())
 
     # Force starting at start of the requested month and year
     driver.find_element(By.ID, "comboMesesAnyos").click()
@@ -183,7 +176,13 @@ def get_web_xml():
         EC.presence_of_element_located((By.CLASS_NAME, "fc-event-container"))
     )
 
-    try_until_success(lambda: driver.find_element(By.ID, "comboMesesAnyos").click())
+    _try_until_success(lambda: driver.find_element(By.ID, "comboMesesAnyos").click())
+
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located(
+            (By.CSS_SELECTOR, f'option[value="{starting_month}/{starting_year}"]')
+        )
+    )
 
     driver.find_element(
         By.CSS_SELECTOR, f'option[value="{starting_month}/{starting_year}"]'
@@ -192,9 +191,6 @@ def get_web_xml():
         EC.presence_of_element_located((By.CLASS_NAME, "fc-event-container"))
     )
 
-    WebDriverWait(driver, 10).until(
-        EC.presence_of_element_located((By.CLASS_NAME, "fc-event-container"))
-    )
     # Skip the first `weeks_to_skip` weeks
     for _ in range(weeks_to_skip):
         driver.find_element(By.CLASS_NAME, "fc-button-next").click()
@@ -205,6 +201,9 @@ def get_web_xml():
     # Get the starting day
     starting_day = int(driver.find_element(By.CLASS_NAME, "fc-header-title").text[:2])
     date = datetime.date(starting_year, starting_month, starting_day)
+
+    # Fill the weeks list
+    weeks: List[Week] = list()
     for i in range(number_of_weeks):
         week = Week(date)
 
@@ -217,19 +216,18 @@ def get_web_xml():
                 event.get_attribute("outerHTML")
                 for event in driver.find_elements(By.CLASS_NAME, "fc-event")
             ]
-            week = parse_html_to_week(events, date)
+            week = _parse_events_to_week(events, date)
 
         except TimeoutException:
             print(f"WARNING: No events in week {i}")
 
-        print(week)
+        weeks.append(week)
 
         driver.find_element(By.CLASS_NAME, "fc-button-next").click()
         date += datetime.timedelta(weeks=1)
 
-    # while True:
-    #     pass
+    return weeks
 
 
-if __name__ == "__main__":
-    get_web_xml()
+# if __name__ == "__main__":
+#     get_weeks_from_web(list(SUBJECT_PROPS.keys()))
