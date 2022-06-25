@@ -5,7 +5,24 @@ import drawSvg as draw
 from svglib.svglib import svg2rlg, register_font
 from reportlab.graphics import renderPDF
 
-from utils import MONTH_NAME, HolidayType, Subject, SubjectProps, SubjectType, Week
+from utils import HolidayType, Subject, SubjectProps, SubjectType, Week
+
+
+# Month number to month name
+_MONTH_NAME = [
+    "gen",
+    "febr",
+    "març",
+    "abr",
+    "maig",
+    "juny",
+    "jul",
+    "ago",
+    "set",
+    "oct",
+    "nov",
+    "des",
+]
 
 
 def render_to_pdf(weeks: List[Week], subjects_props: Dict[str, SubjectProps]):
@@ -173,7 +190,7 @@ def render_to_pdf(weeks: List[Week], subjects_props: Dict[str, SubjectProps]):
             day_x = get_day_x(day_n)
             d.append(
                 draw.Text(
-                    f"{day.date.day}-{MONTH_NAME[day.date.month-1]}",
+                    f"{day.date.day}-{_MONTH_NAME[day.date.month-1]}",
                     text_size,
                     day_x + day_width / 2,
                     height - day_label_height / 2,

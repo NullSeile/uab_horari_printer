@@ -5,34 +5,9 @@ from typing import Dict, List
 
 
 class SubjectProps:
-	def __init__(self, name: str, color: str):
-		self.name = name
-		self.color = color
-
-# Which subjects to get (short name and color)
-SUBJECT_PROPS = {
-    "100095": SubjectProps("GL", "#ffd28a"),
-    "100098": SubjectProps("SMD", "#afeeee"),
-    "100096": SubjectProps("EA", "#e9ffa4"),
-    "100099": SubjectProps("TM", "#ffb3ad"),
-    "100087": SubjectProps("FVR", "#aba6ff"),
-}
-
-# Month number to month name
-MONTH_NAME = [
-    "gen",
-    "febr",
-    "març",
-    "abr",
-    "maig",
-    "juny",
-    "jul",
-    "ago",
-    "set",
-    "oct",
-    "nov",
-    "des",
-]
+    def __init__(self, name: str, color: str):
+        self.name = name
+        self.color = color
 
 
 class SubjectType(IntEnum):

@@ -1,33 +1,19 @@
-from asyncio import events
 import datetime
-from functools import partial
 import re
 from time import sleep
 from typing import Callable, List
+
 from selenium import webdriver
-from selenium.webdriver.support.ui import Select, WebDriverWait
+from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.remote.webdriver import WebDriver
-from selenium.webdriver.remote.webelement import WebElement
 from selenium.common.exceptions import TimeoutException
 
-from bs4 import BeautifulSoup, Tag
+from bs4 import BeautifulSoup
 import bs4.element
 
-from utils import SUBJECT_PROPS, HolidayType, Subject, SubjectType, Week
-
-# from selenium.webdriver.remote.webelement import WebElement
-
-# starting_month = 2
-# starting_year = 2022
-
-# How many weeks
-# number_of_weeks = 1
-
-# If you want to skip any starting week
-# weeks_to_skip = 1
+from utils import HolidayType, Subject, SubjectType, Week
 
 
 def _try_until_success(method: Callable):
