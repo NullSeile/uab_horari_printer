@@ -115,6 +115,10 @@ def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
 
                 week[day_n].add_subject(h, subject)
 
+    for day in week.days.values():
+        if day.holiday is not None and day.hours:
+            day.holiday = None
+
     return week
 
 
@@ -151,13 +155,13 @@ def get_weeks_from_web(
 
     # Force starting at start of the requested month and year
     driver.find_element(By.ID, "comboMesesAnyos").click()
-    driver.find_element(By.CSS_SELECTOR, f'option[value="9/2021"]').click()
+    driver.find_element(By.CSS_SELECTOR, f'option[value="9/{starting_year}"]').click()
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CLASS_NAME, "fc-event-container"))
     )
 
     driver.find_element(By.ID, "comboMesesAnyos").click()
-    driver.find_element(By.CSS_SELECTOR, f'option[value="10/2021"]').click()
+    driver.find_element(By.CSS_SELECTOR, f'option[value="10/{starting_year}"]').click()
     WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CLASS_NAME, "fc-event-container"))
     )
@@ -209,7 +213,7 @@ def get_weeks_from_web(
 
         weeks.append(week)
 
-        driver.find_element(By.CLASS_NAME, "fc-button-next").click()
+        _try_until_success(driver.find_element(By.CLASS_NAME, "fc-button-next").click)
         date += datetime.timedelta(weeks=1)
 
     return weeks

@@ -1,7 +1,6 @@
-from ctypes import Union
 import datetime
 from enum import IntEnum
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 
 class SubjectProps:
@@ -45,7 +44,7 @@ class Subject:
 class Day:
     def __init__(self):
         self.hours: Dict[int, List[Subject]] = dict()  # key = hour, value = subject
-        self.holiday: Union[None, HolidayType] = None
+        self.holiday: Optional[HolidayType] = None
         self.date: datetime.date = None
 
     def add_subject(self, hour, subject):
