@@ -4,9 +4,10 @@ from typing import Dict, List, Optional
 
 
 class SubjectProps:
-    def __init__(self, name: str, color: str):
+    def __init__(self, name: str, color: str, group: Optional[str] = None):
         self.name = name
         self.color = color
+        self.group = group
 
 
 class SubjectType(IntEnum):

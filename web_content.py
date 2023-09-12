@@ -1,19 +1,22 @@
 import datetime
 import re
 from time import sleep
-from typing import Callable, List
+from typing import Callable, List, Dict, Optional
 
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.select import Select
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
 
+from tqdm import tqdm
+
 from bs4 import BeautifulSoup
 import bs4.element
 
-from utils import HolidayType, Subject, SubjectType, Week
+from utils import HolidayType, Subject, SubjectType, SubjectProps, Week
 
 
 def _try_until_success(method: Callable):
@@ -26,7 +29,6 @@ def _try_until_success(method: Callable):
 
 
 def _get_day_number_from_event(event: bs4.element.Tag):
-
     # Position in the screen of each day
     WEEKDAYS_X = [62, 207, 351, 495, 639, 779]  # Saturday
 
@@ -43,7 +45,7 @@ def _get_day_number_from_event(event: bs4.element.Tag):
     raise ValueError(f"{event} does not fit in any day")
 
 
-def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
+def _parse_events_to_week(events: List[Optional[str]], date: datetime.date) -> Week:
     week = Week(date)
 
     for event_html in events:
@@ -71,6 +73,9 @@ def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
             subject = Subject()
 
             subject_id = subject_id_re.group(0)
+            if (loc := subject_id.find("</span>")) != -1:
+                subject_id = subject_id[loc + 7 :]
+
             subject.id = subject_id
 
             # Get the group
@@ -107,12 +112,11 @@ def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
             # Get the hour
             hours = str(event.find("div", {"class": "fc-event-time"}).contents[0])
 
-            start_time = int(hours[:2])
-            end_time = int(hours[8:10])
+            start_time = int(hours[:2])  # + int(hours[3:5]) / 60
+            end_time = int(hours[8:10])  # + int(hours[11:13]) / 60
 
             # Add the Subject
             for h in range(start_time, end_time):
-
                 week[day_n].add_subject(h, subject)
 
     for day in week.days.values():
@@ -123,13 +127,12 @@ def _parse_events_to_week(events: List[str], date: datetime.date) -> Week:
 
 
 def get_weeks_from_web(
-    subjects_id: List[str],
+    subjects: Dict[str, SubjectProps],
     starting_month: int,
     starting_year: int,
     weeks_to_skip: int,
     number_of_weeks: int,
 ) -> List[Week]:
-
     driver = webdriver.Chrome()
 
     driver.get(
@@ -138,13 +141,23 @@ def get_weeks_from_web(
 
     driver.find_element(By.ID, "tabAsignatura").click()
 
-    for id in subjects_id:
+    for id, subject in tqdm(subjects.items()):
         div = driver.find_element(By.CLASS_NAME, "bootstrap-tagsinput")
         input_text = div.find_element(By.CSS_SELECTOR, "input")
         input_text.send_keys(id)
         input_text.send_keys(Keys.ENTER)
 
         sleep(1)
+
+        if subject.group is not None:
+            select = Select(driver.find_element(By.ID, "grupo"))
+            select.select_by_value(subject.group)
+            sleep(5)
+
+        # _try_until_success(lambda: driver.find_element(By.ID, "grupo").click())
+
+        # sleep(10)
+        # exit()
 
         _try_until_success(lambda: driver.find_element(By.ID, "aceptarFiltro").click())
 
@@ -194,7 +207,7 @@ def get_weeks_from_web(
 
     # Fill the weeks list
     weeks: List[Week] = list()
-    for i in range(number_of_weeks):
+    for i in tqdm(range(number_of_weeks)):
         week = Week(date)
 
         try:
@@ -213,8 +226,11 @@ def get_weeks_from_web(
 
         weeks.append(week)
 
-        _try_until_success(driver.find_element(By.CLASS_NAME, "fc-button-next").click)
-        date += datetime.timedelta(weeks=1)
+        if i < number_of_weeks - 1:
+            _try_until_success(
+                driver.find_element(By.CLASS_NAME, "fc-button-next").click
+            )
+            date += datetime.timedelta(weeks=1)
 
     return weeks
 
